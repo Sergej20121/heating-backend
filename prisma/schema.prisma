@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum OtpPurpose {
+  REGISTER
+  RESET_PASSWORD
+}
+
+enum MeterType {
+  COLD_WATER
+  HOT_WATER
+  HEATING
+}
+
+enum RequestStatus {
+  CREATED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model User {
+  id                       String                    @id @default(cuid())
+  phone                    String                    @unique
+  passwordHash             String
+  fullAddress              String
+  contractNumber           String
+  heatedArea               Float?                    @default(0)
+  status                   UserStatus                @default(PENDING)
+  role                     UserRole                  @default(USER)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  meters                   Meter[]
+  otpCodes                 OtpCode[]
+  notifications            Notification[]
+  sealRequests             SealRequest[]
+  meterReplacementRequests MeterReplacementRequest[]
+  payments                 Payment[]
+  heatingCalculationLines  HeatingCalculationLine[]
+
+  @@index([status, createdAt])
+  @@index([role, status])
+}
+
+model OtpCode {
+  id        String     @id @default(cuid())
+  phone     String
+  codeHash  String
+  purpose   OtpPurpose
+  expiresAt DateTime
+  attempts  Int        @default(0)
+  isUsed    Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id])
+
+  @@index([phone, purpose, createdAt])
+  @@index([phone, purpose, isUsed])
+}
+
+
+model Meter {
+  id                      String                    @id @default(cuid())
+  userId                  String
+  title                   String
+  serialNumber            String
+  type                    MeterType
+  isActive                Boolean                   @default(true)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  user                    User                      @relation(fields: [userId], references: [id])
+  sealRequests            SealRequest[]
+  replacementRequestsOld  MeterReplacementRequest[] @relation("OldMeterReplacement")
+  readings                MeterReading[]
+  heatingCalculationLines HeatingCalculationLine[]
+
+  @@unique([serialNumber])
+  @@index([userId, isActive, type])
+}
+
+
+model MeterReading {
+  id        String   @id @default(cuid())
+  meterId   String
+  value     Int
+  createdAt DateTime @default(now())
+  meter     Meter    @relation(fields: [meterId], references: [id])
+
+  @@index([meterId, createdAt])
+}
+
+
+model SealRequest {
+  id            String        @id @default(cuid())
+  userId        String
+  meterId       String?
+  comment       String?
+  preferredDate DateTime?
+  status        RequestStatus @default(CREATED)
+  adminComment  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id])
+  meter         Meter?        @relation(fields: [meterId], references: [id])
+
+  @@index([userId, status, createdAt])
+  @@index([meterId, status])
+}
+
+
+model MeterReplacementRequest {
+  id              String        @id @default(cuid())
+  userId          String
+  oldMeterId      String
+  newTitle        String
+  newSerialNumber String
+  newType         MeterType
+  initialReading  Int
+  reason          String
+  comment         String?
+  status          RequestStatus @default(CREATED)
+  adminComment    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  approvedAt      DateTime?
+  user            User          @relation(fields: [userId], references: [id])
+  oldMeter        Meter         @relation("OldMeterReplacement", fields: [oldMeterId], references: [id])
+
+  @@index([userId, status, createdAt])
+  @@index([oldMeterId, status])
+}
+
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead, createdAt])
+}
+
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([isActive, createdAt])
+}
+
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  billingMonth      String
+  amount            Int
+  consumption       Int
+  dueDate           DateTime
+  status            PaymentStatus @default(PENDING)
+  paidAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  calculationRunId  String?
+  calculationLineId String?
+  user              User          @relation(fields: [userId], references: [id])
+
+  @@unique([userId, billingMonth])
+  @@index([billingMonth])
+  @@index([userId, status, dueDate])
+  @@index([calculationRunId])
+  @@index([calculationLineId])
+}
+
+model HeatingSetting {
+  id                    String   @id @default(cuid())
+  effectiveFromMonth    String   @unique
+  tariffPerUnit         Float
+  normPerSquareMeter    Float
+  seasonCoefficient     Float    @default(1)
+  commonAreaCoefficient Float    @default(1)
+  lossCoefficient       Float    @default(1)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model HeatingCalculationRun {
+  id                    String   @id @default(cuid())
+  billingMonth          String
+  tariffPerUnit         Float
+  normPerSquareMeter    Float
+  seasonCoefficient     Float
+  commonAreaCoefficient Float
+  lossCoefficient       Float
+  createdAt             DateTime @default(now())
+
+  lines HeatingCalculationLine[]
+}
+
+model HeatingCalculationLine {
+  id                    String   @id @default(cuid())
+  runId                 String
+  userId                String
+  meterId               String?
+  billingMonth          String
+  method                String
+  area                  Float
+  previousReading       Int?
+  currentReading        Int?
+  rawConsumption        Float
+  finalConsumption      Float
+  normPerSquareMeter    Float
+  seasonCoefficient     Float
+  commonAreaCoefficient Float
+  lossCoefficient       Float
+  tariffPerUnit         Float
+  amount                Int
+  createdAt             DateTime @default(now())
+
+  run   HeatingCalculationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meter Meter?                @relation(fields: [meterId], references: [id], onDelete: SetNull)
+
+  @@index([billingMonth])
+  @@index([userId, billingMonth])
+  @@index([meterId])
+}

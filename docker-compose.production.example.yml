@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: heating_app
+      POSTGRES_USER: heating_user
+      POSTGRES_PASSWORD: CHANGE_ME_STRONG_PASSWORD
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
