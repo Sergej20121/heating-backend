@@ -29,7 +29,14 @@ function requireEnv(name: string) {
 
 function hasUnsafePlaceholder(value: string) {
   const normalized = value.toLowerCase();
-  return normalized.includes('change_me') || normalized.includes('replace') || normalized.includes('your-domain') || normalized.includes('your-real-domain') || normalized.includes('example.com') || normalized.includes('localhost') || normalized.includes('127.0.0.1') || normalized.includes('strong_db_password');
+  return (
+    normalized.includes('change_me') ||
+    normalized.includes('replace') ||
+    normalized.includes('your-domain') ||
+    normalized.includes('your-real-domain') ||
+    normalized.includes('example.com') ||
+    normalized.includes('strong_db_password')
+  );
 }
 
 export function isProductionEnv() {
@@ -100,6 +107,9 @@ export function isMockPaymentsEnabled() {
   return parseBooleanEnv(process.env.ENABLE_MOCK_PAYMENTS, !isProductionEnv());
 }
 
+/**
+ * 🔥 ИСПРАВЛЕННЫЙ validateProductionEnv
+ */
 export function validateProductionEnv() {
   if (!isProductionEnv()) return;
 
@@ -110,12 +120,24 @@ export function validateProductionEnv() {
 
   const databaseUrl = requireEnv('DATABASE_URL');
   if (hasUnsafePlaceholder(databaseUrl)) {
-    throw new Error('DATABASE_URL must point to a real production database, not localhost or placeholder value');
+    throw new Error('DATABASE_URL must point to a real production database');
   }
 
   const corsOrigins = getCorsOrigins();
-  if (!corsOrigins.length || corsOrigins.some((origin) => hasUnsafePlaceholder(origin) || !origin.startsWith('https://'))) {
-    throw new Error('CORS_ORIGINS must contain real https:// production origins');
+
+  const invalidCorsOrigins = corsOrigins.filter((origin) => {
+    const value = origin.toLowerCase();
+
+    const isHttps = value.startsWith('https://');
+    const isLocalhost =
+      value.startsWith('http://localhost') ||
+      value.startsWith('http://127.0.0.1');
+
+    return !isHttps && !isLocalhost;
+  });
+
+  if (!corsOrigins.length || invalidCorsOrigins.length > 0) {
+    throw new Error('CORS_ORIGINS must contain https:// or localhost origins');
   }
 
   if (parseBooleanEnv(process.env.ADMIN_REGISTRATION_ENABLED, false)) {
