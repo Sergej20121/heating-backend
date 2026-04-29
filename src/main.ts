@@ -83,7 +83,7 @@ function applyRateLimit(app: any) {
 
 async function bootstrap() {
   validateProductionEnv();
-  const app = await NestFactory.create(AppModule, { cors: false });
+  const app: any = await NestFactory.create(AppModule, { cors: false });
 
   app.enableCors({
     origin: getCorsOrigins(),
