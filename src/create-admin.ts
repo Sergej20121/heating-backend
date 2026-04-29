@@ -1,5 +1,5 @@
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import * as bcrypt from 'bcrypt';
 import { validatePasswordOrThrow } from './common/password-policy';
 
 const prisma = new PrismaClient();
