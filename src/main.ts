@@ -55,7 +55,12 @@ function applyRateLimit(app: any) {
     const now = Date.now();
     const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
     const ip = forwardedFor || req.ip || req.socket?.remoteAddress || 'unknown';
-    const isAuthPath = String(req.path || '').includes('/auth/login') || String(req.path || '').includes('/auth/register') || String(req.path || '').includes('/auth/forgot-password') || String(req.path || '').includes('/auth/reset-password');
+    const isAuthPath =
+      String(req.path || '').includes('/auth/login') ||
+      String(req.path || '').includes('/auth/register') ||
+      String(req.path || '').includes('/auth/forgot-password') ||
+      String(req.path || '').includes('/auth/reset-password');
+
     const limit = isAuthPath ? authMaxRequests : maxRequests;
     const key = `${ip}:${req.method}:${req.path}`;
     const bucket = requestBuckets.get(key);
@@ -69,8 +74,13 @@ function applyRateLimit(app: any) {
     }
 
     if (bucket.count >= limit) {
-      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
-      return res.status(429).json({ message: 'Слишком много запросов. Повторите позже.' });
+      res.setHeader(
+        'Retry-After',
+        String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))),
+      );
+      return res.status(429).json({
+        message: 'Слишком много запросов. Повторите позже.',
+      });
     }
 
     bucket.count += 1;
@@ -83,6 +93,7 @@ function applyRateLimit(app: any) {
 
 async function bootstrap() {
   validateProductionEnv();
+
   const app: any = await NestFactory.create(AppModule, { cors: false });
 
   app.enableCors({
@@ -91,11 +102,14 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new ApiExceptionFilter());
+
   applyBasicSecurityHeaders(app);
   applyRateLimit(app);
   startRateLimitCleanup();
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -105,8 +119,14 @@ async function bootstrap() {
     }),
   );
 
+  // 🔥 ВАЖНО: health check для Render
+  app.getHttpAdapter().get('/health', (req: any, res: any) => {
+    res.status(200).send('OK');
+  });
+
   const port = Number(process.env.PORT || 3000);
   await app.listen(port, '0.0.0.0');
+
   console.log(`Server started on port ${port}. API path: /api`);
 }
 
