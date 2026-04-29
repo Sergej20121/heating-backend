@@ -26,9 +26,11 @@ function applyBasicSecurityHeaders(app: any) {
     res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
     res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
     res.setHeader('X-DNS-Prefetch-Control', 'off');
+
     if (isProductionEnv()) {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
+
     next();
   });
 }
@@ -36,12 +38,16 @@ function applyBasicSecurityHeaders(app: any) {
 function startRateLimitCleanup() {
   const cleanup = () => {
     const now = Date.now();
+
     for (const [key, value] of requestBuckets.entries()) {
-      if (value.resetAt <= now) requestBuckets.delete(key);
+      if (value.resetAt <= now) {
+        requestBuckets.delete(key);
+      }
     }
   };
 
   cleanup();
+
   const timer = setInterval(cleanup, getRateLimitCleanupIntervalMs());
   timer.unref?.();
 }
@@ -53,8 +59,12 @@ function applyRateLimit(app: any) {
 
   app.use((req: any, res: any, next: () => void) => {
     const now = Date.now();
-    const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
+    const forwardedFor = String(req.headers['x-forwarded-for'] || '')
+      .split(',')[0]
+      ?.trim();
+
     const ip = forwardedFor || req.ip || req.socket?.remoteAddress || 'unknown';
+
     const isAuthPath =
       String(req.path || '').includes('/auth/login') ||
       String(req.path || '').includes('/auth/register') ||
@@ -74,19 +84,18 @@ function applyRateLimit(app: any) {
     }
 
     if (bucket.count >= limit) {
-      res.setHeader(
-        'Retry-After',
-        String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))),
-      );
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
       return res.status(429).json({
         message: 'Слишком много запросов. Повторите позже.',
       });
     }
 
     bucket.count += 1;
+
     res.setHeader('X-RateLimit-Limit', String(limit));
     res.setHeader('X-RateLimit-Remaining', String(Math.max(0, limit - bucket.count)));
     res.setHeader('X-RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
+
     next();
   });
 }
@@ -94,7 +103,7 @@ function applyRateLimit(app: any) {
 async function bootstrap() {
   validateProductionEnv();
 
-  const app: any = await NestFactory.create(AppModule, { cors: false });
+  const app = await NestFactory.create(AppModule);
 
   app.enableCors({
     origin: getCorsOrigins(),
@@ -119,7 +128,6 @@ async function bootstrap() {
     }),
   );
 
-  // 🔥 ВАЖНО: health check для Render
   app.getHttpAdapter().get('/health', (req: any, res: any) => {
     res.status(200).send('OK');
   });
