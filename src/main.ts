@@ -85,7 +85,6 @@ async function bootstrap() {
   validateProductionEnv();
   const app = await NestFactory.create(AppModule, { cors: false });
 
-  app.enable('trust proxy');
   app.enableCors({
     origin: getCorsOrigins(),
     credentials: true,
