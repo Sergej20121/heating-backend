@@ -5,7 +5,7 @@ import { getJwtExpiresIn, getJwtSecret } from '../env';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { AdminPaymentsController } from './admin-payments.controller';
-
+import { PaymentGatewayService } from './payment-gateway.service';
 @Module({
   imports: [
     JwtModule.register({
@@ -14,6 +14,6 @@ import { AdminPaymentsController } from './admin-payments.controller';
     }),
   ],
   controllers: [PaymentsController, AdminPaymentsController],
-  providers: [PaymentsService, PrismaService],
+  providers: [PaymentsService, PaymentGatewayService],
 })
 export class PaymentsModule {}
