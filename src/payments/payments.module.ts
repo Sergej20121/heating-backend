@@ -6,6 +6,7 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { AdminPaymentsController } from './admin-payments.controller';
 import { PaymentGatewayService } from './payment-gateway.service';
+
 @Module({
   imports: [
     JwtModule.register({
@@ -14,6 +15,6 @@ import { PaymentGatewayService } from './payment-gateway.service';
     }),
   ],
   controllers: [PaymentsController, AdminPaymentsController],
-  providers: [PaymentsService, PaymentGatewayService],
+  providers: [PrismaService, PaymentsService, PaymentGatewayService],
 })
 export class PaymentsModule {}
